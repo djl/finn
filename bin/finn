@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+import codecs
+import datetime
+import fnmatch
+import itertools
+import os
+
+from jinja2 import Environment, FileSystemLoader
+from markdown import markdown
+
+
+ENV = Environment(loader=FileSystemLoader('templates'))
+
+
+class Entry(object):
+
+    template = 'single.html'
+
+    def __init__(self, filename):
+        fh = codecs.open(filename, 'r', 'utf-8').read()
+        self.head, self.body = fh.split('\n\n', 1)
+        for header in self.head.split('\n'):
+            key, value = header.split(': ', 1)
+            setattr(self, key.lower(), value)
+
+        self.date = datetime.datetime.strptime(self.date, '%Y-%m-%d %H:%M:%S')
+        self.source = os.path.abspath(filename)
+
+    def __repr__(self):
+        return self.title
+
+    @property
+    def html(self):
+        return markdown(self.body)
+
+    @property
+    def dest(self):
+        return os.path.join(self.date.strftime("%Y/%m/%d/"), self.slug + '.html')
+
+    @property
+    def changed(self):
+        dest = os.path.abspath(os.path.join('build', self.dest))
+        try:
+            mdest = os.path.getmtime(dest)
+            msource = os.path.getmtime(self.source)
+            return msource > mdest
+        except:
+            return True
+
+    def write_file(self):
+        if self.changed:
+            render_file(self.dest, self.__class__.__name__.lower() + '.html', entry=self)
+
+
+class Page(Entry):
+    @property
+    def dest(self):
+        return self.slug + '.html'
+
+
+def render_file(filename, template, **context):
+    filename = os.path.join('build', filename.strip('/'))
+    dirname = os.path.dirname(filename)
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+
+    t = ENV.get_template(template)
+    with open(filename, 'w') as f:
+        f.write(t.render(**context).encode('utf-8'))
+
+
+def rglob(dir, pattern):
+    matches = []
+    for root, dirnames, filenames in os.walk(dir):
+      for filename in fnmatch.filter(filenames, pattern):
+          matches.append(os.path.join(root, filename))
+    return matches
+
+
+if __name__ == '__main__':
+    pages = map(Page, rglob('source/pages', '*.markdown'))
+    entries = map(Entry, rglob('source/entries', '*.markdown'))
+    entries.sort(key=lambda x: x.date, reverse=True)
+    monthly = itertools.groupby(entries, lambda x: x.date.strftime("%Y/%m"))
+    daily = itertools.groupby(entries, lambda x: x.date.strftime("%Y/%m/%d"))
+
+    for page in pages:
+        page.write_file()
+
+    for span in [monthly, daily]:
+        for group in span:
+            filename = os.path.join(group[0], 'index.html')
+            render_file(filename, 'base.html', entries=group[1])
+
+    for entry in entries:
+        entry.write_file()
+
+    render_file('index.html', 'base.html', entries=entries[:30])
