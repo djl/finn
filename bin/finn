@@ -6,7 +6,6 @@ Options:
   -f, --foce                 Force regeneration
   -h, --help                 Show this help message and exit
 """
-import codecs
 import datetime
 import fnmatch
 import itertools
@@ -48,7 +47,7 @@ def rglob(dir, pattern):
 class Entry(object):
 
     def __init__(self, filename):
-        fh = codecs.open(filename, 'r', 'utf-8').read()
+        fh = open(filename, 'r').read().decode('utf-8')
         self.head, self.body = fh.split('\n\n', 1)
         for header in self.head.split('\n'):
             key, value = header.split(': ', 1)
