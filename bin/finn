@@ -1,9 +1,18 @@
 #!/usr/bin/env python
+"""
+Usage: finn [options]
+
+Options:
+  -f, --foce                 Force regeneration
+  -h, --help                 Show this help message and exit
+"""
 import codecs
 import datetime
 import fnmatch
 import itertools
+import optparse
 import os
+import sys
 
 from jinja2 import Environment, FileSystemLoader
 from markdown import markdown
@@ -12,50 +21,9 @@ from markdown import markdown
 ENV = Environment(loader=FileSystemLoader('templates'))
 
 
-class Entry(object):
-
-    template = 'single.html'
-
-    def __init__(self, filename):
-        fh = codecs.open(filename, 'r', 'utf-8').read()
-        self.head, self.body = fh.split('\n\n', 1)
-        for header in self.head.split('\n'):
-            key, value = header.split(': ', 1)
-            setattr(self, key.lower(), value)
-
-        self.date = datetime.datetime.strptime(self.date, '%Y-%m-%d %H:%M:%S')
-        self.source = os.path.abspath(filename)
-
-    def __repr__(self):
-        return self.title
-
-    @property
-    def html(self):
-        return markdown(self.body)
-
-    @property
-    def dest(self):
-        return os.path.join(self.date.strftime("%Y/%m/%d/"), self.slug + '.html')
-
-    @property
-    def changed(self):
-        dest = os.path.abspath(os.path.join('build', self.dest))
-        try:
-            mdest = os.path.getmtime(dest)
-            msource = os.path.getmtime(self.source)
-            return msource > mdest
-        except:
-            return True
-
-    def write_file(self):
-        if self.changed:
-            render_file(self.dest, self.__class__.__name__.lower() + '.html', entry=self)
-
-
-class Page(Entry):
-    @property
-    def dest(self):
-        return self.slug + '.html'
+def helper(*args, **kwargs):
+    sys.stderr.write(__doc__.strip() + '\n')
+    sys.exit(0)
 
 
 def render_file(filename, template, **context):
@@ -77,15 +45,77 @@ def rglob(dir, pattern):
     return matches
 
 
+class Entry(object):
+
+    def __init__(self, filename):
+        fh = codecs.open(filename, 'r', 'utf-8').read()
+        self.head, self.body = fh.split('\n\n', 1)
+        for header in self.head.split('\n'):
+            key, value = header.split(': ', 1)
+            setattr(self, key.lower(), value)
+
+        self.date = datetime.datetime.strptime(self.date, '%Y-%m-%d %H:%M:%S')
+        self.source = os.path.abspath(filename)
+
+    def __repr__(self):
+        return self.title
+
+    @property
+    def changed(self):
+        dest = os.path.abspath(os.path.join('build', self.dest))
+        try:
+            mdest = os.path.getmtime(dest)
+            msource = os.path.getmtime(self.source)
+            return msource > mdest
+        except:
+            return True
+
+    @property
+    def html(self):
+        return markdown(self.body)
+
+    @property
+    def dest(self):
+        return os.path.join(self.date.strftime("%Y/%m/%d/"), self.slug + '.html')
+
+    @property
+    def path(self):
+        return os.path.splitext(self.dest)[0]
+
+
+class Page(Entry):
+    @property
+    def dest(self):
+        return self.slug + '.html'
+
+
 if __name__ == '__main__':
+    parser = optparse.OptionParser()
+    parser.remove_option('--help')
+    parser.add_option('-h', '--help', action='callback', callback=helper)
+    parser.add_option('-f', '--force', dest='force', action='store_true', default=False)
+    options, args = parser.parse_args()
+
     pages = map(Page, rglob('source/pages', '*.markdown'))
     entries = map(Entry, rglob('source/entries', '*.markdown'))
     entries.sort(key=lambda x: x.date, reverse=True)
+    yearly = itertools.groupby(entries, lambda x: x.date.strftime("%Y"))
     monthly = itertools.groupby(entries, lambda x: x.date.strftime("%Y/%m"))
     daily = itertools.groupby(entries, lambda x: x.date.strftime("%Y/%m/%d"))
 
     for page in pages:
-        page.write_file()
+        if page.changed or options.force:
+            render_file(page.dest, 'page.html', entry=page)
+
+    for year, yearly_entries in yearly:
+        results = {}
+        months = []
+        entries_by_month = itertools.groupby(yearly_entries, lambda x: x.date.strftime("%m-%B"))
+        for month, _ in entries_by_month:
+            months.append(month.split('-'))
+        results[year] = sorted(months)
+        filename = os.path.join(year, 'index.html')
+        render_file(filename, 'year.html', entries=results, year=year)
 
     for span in [monthly, daily]:
         for group in span:
@@ -93,6 +123,7 @@ if __name__ == '__main__':
             render_file(filename, 'base.html', entries=group[1])
 
     for entry in entries:
-        entry.write_file()
+        if entry.changed or options.force:
+            render_file(entry.dest, 'entry.html', entry=entry)
 
     render_file('index.html', 'base.html', entries=entries[:30])
