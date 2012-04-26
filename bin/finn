@@ -3,7 +3,7 @@
 Usage: finn [options]
 
 Options:
-  -f, --foce                 Force regeneration
+  -f, --fore                 Force regeneration
   -h, --help                 Show this help message and exit
 """
 import datetime
