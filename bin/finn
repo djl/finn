@@ -20,30 +20,6 @@ from markdown import markdown
 ENV = Environment(loader=FileSystemLoader('templates'))
 
 
-def helper(*args, **kwargs):
-    sys.stderr.write(__doc__.strip() + '\n')
-    sys.exit(0)
-
-
-def render_file(filename, template, **context):
-    filename = os.path.join('build', filename.strip('/'))
-    dirname = os.path.dirname(filename)
-    if not os.path.isdir(dirname):
-        os.makedirs(dirname)
-
-    t = ENV.get_template(template)
-    with open(filename, 'w') as f:
-        f.write(t.render(**context).encode('utf-8'))
-
-
-def rglob(dir, pattern):
-    matches = []
-    for root, dirnames, filenames in os.walk(dir):
-      for filename in fnmatch.filter(filenames, pattern):
-          matches.append(os.path.join(root, filename))
-    return matches
-
-
 class Entry(object):
 
     def __init__(self, filename):
@@ -88,7 +64,31 @@ class Page(Entry):
         return self.slug + '.html'
 
 
-if __name__ == '__main__':
+def helper(*args, **kwargs):
+    sys.stderr.write(__doc__.strip() + '\n')
+    sys.exit(0)
+
+
+def render_file(filename, template, **context):
+    filename = os.path.join('build', filename.strip('/'))
+    dirname = os.path.dirname(filename)
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+
+    t = ENV.get_template(template)
+    with open(filename, 'w') as f:
+        f.write(t.render(**context).encode('utf-8'))
+
+
+def rglob(dir, pattern):
+    matches = []
+    for root, dirnames, filenames in os.walk(dir):
+      for filename in fnmatch.filter(filenames, pattern):
+          matches.append(os.path.join(root, filename))
+    return matches
+
+
+def main():
     parser = optparse.OptionParser()
     parser.remove_option('--help')
     parser.add_option('-h', '--help', action='callback', callback=helper)
@@ -126,3 +126,7 @@ if __name__ == '__main__':
             render_file(entry.dest, 'entry.html', post=post)
 
     render_file('index.html', 'base.html', posts=posts[:30])
+
+
+if __name__ == '__main__':
+    main()
