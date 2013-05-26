@@ -1,15 +1,10 @@
 #!/usr/bin/env python
 """
-Usage: finn [options]
-
-Options:
-  -f, --fore                 Force regeneration
-  -h, --help                 Show this help message and exit
+Usage: finn [-f]
 """
 import datetime
 import fnmatch
 import itertools
-import optparse
 import os
 import sys
 
@@ -89,12 +84,7 @@ def rglob(dir, pattern):
 
 
 def main():
-    parser = optparse.OptionParser()
-    parser.remove_option('--help')
-    parser.add_option('-h', '--help', action='callback', callback=helper)
-    parser.add_option('-f', '--force', dest='force', action='store_true', default=False)
-    options, args = parser.parse_args()
-
+    force = '-f' in sys.argv
     pages = map(Page, rglob('source/pages', '*.markdown'))
     posts = map(Entry, rglob('source/posts', '*.markdown'))
     posts.sort(key=lambda x: x.date, reverse=True)
@@ -103,15 +93,14 @@ def main():
     daily = itertools.groupby(posts, lambda x: x.date.strftime("%Y/%m/%d"))
 
     for page in pages:
-        if page.changed or options.force:
+        if page.changed or force:
             render_file(page.dest, 'page.html', entry=page)
 
     for year, yearly_posts in yearly:
         results = {}
         months = []
         posts_by_month = itertools.groupby(yearly_posts, lambda x: x.date.strftime("%m-%B"))
-        for month, _ in posts_by_month:
-            months.append(month.split('-'))
+        months = [month.split('-') for month, _ in posts_by_month]
         results[year] = sorted(months)
         filename = os.path.join(year, 'index.html')
         render_file(filename, 'year.html', posts=results, year=year)
@@ -122,7 +111,7 @@ def main():
             render_file(filename, 'base.html', posts=group[1])
 
     for entry in posts:
-        if entry.changed or options.force:
+        if entry.changed or force:
             render_file(entry.dest, 'entry.html', post=post)
 
     render_file('index.html', 'base.html', posts=posts[:30])
