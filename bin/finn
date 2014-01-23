@@ -94,11 +94,10 @@ def main():
 
     for page in pages:
         if page.changed or force:
-            render_file(page.dest, 'page.html', entry=page)
+            render_file(page.dest, 'page.html', post=page)
 
     for year, yearly_posts in yearly:
         results = {}
-        months = []
         posts_by_month = itertools.groupby(yearly_posts, lambda x: x.date.strftime("%m-%B"))
         months = [month.split('-') for month, _ in posts_by_month]
         results[year] = sorted(months)
@@ -110,9 +109,9 @@ def main():
             filename = os.path.join(group[0], 'index.html')
             render_file(filename, 'base.html', posts=group[1])
 
-    for entry in posts:
-        if entry.changed or force:
-            render_file(entry.dest, 'entry.html', post=post)
+    for post in posts:
+        if post.changed or force:
+            render_file(post.dest, 'post.html', post=post)
 
     render_file('index.html', 'base.html', posts=posts[:30])
 
