@@ -32,12 +32,12 @@ class Entry(object):
 
     @property
     def changed(self):
-        dest = os.path.abspath(os.path.join('build', self.dest))
         try:
+            dest = os.path.abspath(os.path.join('build', self.dest))
             mdest = os.path.getmtime(dest)
             msource = os.path.getmtime(self.source)
             return msource > mdest
-        except:
+        except OSError:
             return True
 
     @property
