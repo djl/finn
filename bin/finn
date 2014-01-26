@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader
 from markdown import markdown
 
 
+BUILD_DIR = 'build'
 ENV = Environment(loader=FileSystemLoader('templates'))
 
 
@@ -33,7 +34,7 @@ class Entry(object):
     @property
     def changed(self):
         try:
-            dest = os.path.abspath(os.path.join('build', self.dest))
+            dest = os.path.abspath(os.path.join(BUILD_DIR, self.dest))
             mdest = os.path.getmtime(dest)
             msource = os.path.getmtime(self.source)
             return msource > mdest
@@ -46,11 +47,11 @@ class Entry(object):
 
     @property
     def dest(self):
-        return os.path.join(self.date.strftime("%Y/%m/%d/"), self.slug + '.html')
+        return os.path.join(self.date.strftime("%Y/%m/%d"), self.slug + '.html')
 
     @property
     def path(self):
-        return os.path.splitext(self.dest)[0]
+        return os.path.join('/', os.path.splitext(self.dest)[0])
 
 
 class Page(Entry):
@@ -59,13 +60,8 @@ class Page(Entry):
         return self.slug + '.html'
 
 
-def helper(*args, **kwargs):
-    sys.stderr.write(__doc__.strip() + '\n')
-    sys.exit(0)
-
-
 def render_file(filename, template, **context):
-    filename = os.path.join('build', filename.strip('/'))
+    filename = os.path.join(BUILD_DIR, filename.strip('/'))
     dirname = os.path.dirname(filename)
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
@@ -78,8 +74,8 @@ def render_file(filename, template, **context):
 def rglob(dir, pattern):
     matches = []
     for root, dirnames, filenames in os.walk(dir):
-      for filename in fnmatch.filter(filenames, pattern):
-          matches.append(os.path.join(root, filename))
+        for filename in fnmatch.filter(filenames, pattern):
+            matches.append(os.path.join(root, filename))
     return matches
 
 
@@ -96,11 +92,9 @@ def main():
         if page.changed or force:
             render_file(page.dest, 'page.html', post=page)
 
-    for year, yearly_posts in yearly:
-        results = {}
-        posts_by_month = itertools.groupby(yearly_posts, lambda x: x.date.strftime("%m-%B"))
-        months = [month.split('-') for month, _ in posts_by_month]
-        results[year] = sorted(months)
+    for year, yposts in yearly:
+        months = itertools.groupby(yposts, lambda x: x.date.strftime("%m"))
+        results = dict(year=sorted(months))
         filename = os.path.join(year, 'index.html')
         render_file(filename, 'year.html', posts=results, year=year)
 
